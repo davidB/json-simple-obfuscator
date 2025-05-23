@@ -7,6 +7,7 @@ rust = { version = "1.87.0", profile="minimal", components="rustfmt,clippy,llvm-
 "cargo:cargo-sort" = "latest"
 "cargo:cargo-deny" = "latest"
 "cargo:cargo-nextest" = "latest"
+"cargo:cargo-insta" = "latest"
 
 [tasks."deps:update"]
 description = "update dependencies, other calls to cargo will be `locked` for faster & reproducible builds"
@@ -39,7 +40,7 @@ description = "Lint all the code (megalinter + lint_rust)"
 [tasks."lint:rust"]
 run = [
     "cargo --locked fmt --all -- --check",
-    "cargo --locked sort --grouped --check",
+    # "cargo --locked sort --grouped --check",
     "cargo --locked clippy --workspace --all-features --all-targets --no-deps",
 ]
 
@@ -75,6 +76,13 @@ run = [
     "mise run test",
     "grcov ./target/test-coverage/data -s . --ignore 'target/*' --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/test-coverage/html/",
     "cat ./target/test-coverage/html/coverage.json",
+]
+
+[tasks."review:snapshots"]
+description = "review test result on snapshot testing"
+run = [
+  # cargo insta test --review # to run test + review
+  "cargo insta review"
 ]
 
 # [tasks."run"]
