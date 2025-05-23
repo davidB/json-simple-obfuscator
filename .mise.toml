@@ -3,7 +3,7 @@ RUSTC_BOOTSTRAP= "1" # workaround to reduce cli full rebuild / conflict with rus
 
 [settings]
 experimental = true
-idiomatic_version_file_enable_tools = []
+idiomatic_version_file_enable_tools = ["rust"]
 
 [tools]
 rust = { version = "1.87.0", profile="minimal", components="rustfmt,clippy"} # the rust tool stack (with cargo, fmt, clippy) to build source
