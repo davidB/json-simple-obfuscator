@@ -1,0 +1,70 @@
+[package]
+name = "json-simple-obfuscator"
+description = "A tool to partially hide json value (using unsecure pseudonimize / obfuscate algo)."
+keywords = ["json", "obfuscate"]
+categories = []
+edition = "2024"
+version = "0.1.0"
+authors = ["David Bernard"]
+license = "CC0-1.0"
+homepage = "https://github.com/davidB/json-simple-obfuscator"
+repository = "https://github.com/davidB/json-simple-obfuscator"
+publish = true
+
+[dependencies]
+# clap = { version = "4", features = ["derive", "env"] }
+# clap-verbosity-flag = "3"
+# miette = { version = "7", features = ["fancy"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+indoc = "2"
+insta = "*"
+pretty_assertions = "1"
+rstest = "0.25"
+# test-strategy = "0.4"
+
+[target.'cfg(all(target_env = "musl", target_pointer_width = "64"))'.dependencies.jemallocator]
+version = "0.5"
+
+[package.metadata.cargo-machete]
+ignored = [
+  # "handlebars_misc_helpers",
+  "humantime-serde",
+] # auto-registered and used at runtime
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "allow" # not published as crate
+deprecated = "warn"
+warnings = "deny"
+
+[lints.clippy]
+perf = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "allow", priority = -1 }   # not published as crate
+undocumented_unsafe_blocks = "deny"
+dbg_macro = "warn"
+decimal_literal_representation = "warn"
+expect_used = "warn"
+if_then_some_else_none = "warn"
+indexing_slicing = "allow"
+large_include_file = "warn"
+min_ident_chars = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
+rc_buffer = "warn"
+rc_mutex = "warn"
+unnecessary_safety_doc = "warn"
+unwrap_used = "warn"
+module_name_repetitions = "allow"
+
+[profile.release]
+lto = "thin"      # see https://doc.rust-lang.org/cargo/reference/profiles.html#lto
+codegen-units = 1
+strip = "symbols" # "none", "debuginfo", "symbols"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"

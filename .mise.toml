@@ -1,0 +1,88 @@
+[env]
+RUSTC_BOOTSTRAP= "1" # workaround to reduce cli full rebuild / conflict with rust-analyzer (see [VSCode Test Explorer regularly requires a full rebuild · Issue #17149 · rust-lang/rust-analyzer](https://github.com/rust-lang/rust-analyzer/issues/17149))
+
+[tools]
+rust = { version = "1.87.0", profile="minimal", components="rustfmt,clippy,llvm-tools"} # the rust tool stack (with cargo, fmt, clippy) to build source
+"aqua:cargo-bins/cargo-binstall" = "1" # do not use cargo-binstall (it's a special name used by mise)
+"cargo:cargo-sort" = "latest"
+"cargo:cargo-deny" = "latest"
+"cargo:cargo-nextest" = "latest"
+
+[tasks."deps:update"]
+description = "update dependencies, other calls to cargo will be `locked` for faster & reproducible builds"
+run = [
+  "cargo update",
+]
+
+[tasks."build"]
+run = "cargo --locked build"
+
+[tasks."format"]
+alias = "fmt"
+description = "Format the code and sort dependencies"
+run = [
+  "cargo --locked fmt",
+  "cargo --locked sort --grouped",
+  "biome check --write",
+]
+
+[tasks."deny"]
+run = [
+    # "cargo --locked tree -i opentelemetry",
+    "cargo --locked deny --all-features check",
+]
+
+[tasks."lint"]
+depends = ["lint:*"]
+description = "Lint all the code (megalinter + lint_rust)"
+
+[tasks."lint:rust"]
+run = [
+    "cargo --locked fmt --all -- --check",
+    "cargo --locked sort --grouped --check",
+    "cargo --locked clippy --workspace --all-features --all-targets --no-deps",
+]
+
+
+[tasks."lint:dependencies"]
+description = "check if dependencies are unused, outdated,..."
+run = [
+  "cargo --locked machete --with-metadata",
+  "cargo outdated -wR",
+  # "cargo tree --duplicate", # managed by cargo deny
+  # "cargo audit", # check security, maybe done by cargo deny
+]
+
+[tasks."test"]
+# using `depends_post = ["examples:transform:*"]` trigger an error
+# > Infinitive loop detected, all tasks are finished but the graph isn't empty examples:...
+# So as workaround a wait_for is added to every task examples:transform:...
+depends = ["test:unit"]
+
+[tasks."test:unit"]
+run = [
+    "cargo --locked nextest run",
+    # "cargo test --doc",
+    # "cargo hack nextest --each-feature -- --test-threads=1",
+]
+
+[tasks."test:coverage"]
+description = "run test coverage to help identify code not executed on tests (!= code tested)"
+env = { RUSTFLAGS="-Cinstrument-coverage", LLVM_PROFILE_FILE="target/test-coverage/data/%p-%m.profraw" }
+run = [
+    "rm -rf ./target/test-coverage || true",
+    "mkdir -p ./target/test-coverage",
+    "mise run test",
+    "grcov ./target/test-coverage/data -s . --ignore 'target/*' --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/test-coverage/html/",
+    "cat ./target/test-coverage/html/coverage.json",
+]
+
+# [tasks."run"]
+# description = "run a src/main.rs"
+# run = [
+#     "cargo run",
+# ]
+
+[tasks."ci"]
+depends = ["lint", "test", "deny"]
+description = "set of tasks run by CI"
