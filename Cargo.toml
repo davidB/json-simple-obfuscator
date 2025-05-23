@@ -12,21 +12,16 @@ repository = "https://github.com/davidB/json-simple-obfuscator"
 publish = true
 
 [dependencies]
-# clap = { version = "4", features = ["derive", "env"] }
-# clap-verbosity-flag = "3"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
 # miette = { version = "7", features = ["fancy"] }
-# serde = { version = "1", features = ["derive"] }
-# serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 indoc = "2"
-insta = "1"
-# rstest = "0.25"
-# similar-asserts = "*"
-# test-strategy = "0.4"
-
-# [target.'cfg(all(target_env = "musl", target_pointer_width = "64"))'.dependencies.jemallocator]
-# version = "0.5"
+rstest = "0.25"
+similar-asserts = "1"
 
 [package.metadata.cargo-machete]
 ignored = [
@@ -59,10 +54,6 @@ rc_mutex = "warn"
 unnecessary_safety_doc = "warn"
 unwrap_used = "warn"
 module_name_repetitions = "allow"
-
-[profile.dev.package]
-insta.opt-level = 3
-similar.opt-level = 3
 
 [profile.release]
 lto = "thin"      # see https://doc.rust-lang.org/cargo/reference/profiles.html#lto
