@@ -9,16 +9,21 @@ use serde_json::Value;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    input: Vec<PathBuf>,
+    /// path of files to obfuscate
+    file: Vec<PathBuf>,
 }
 
 pub fn main() -> Result<()> {
     let cli = Cli::parse();
-    for json_file in cli.input {
+    let mut count = 0_usize;
+    for json_file in cli.file {
+        //println!("obfuscating {}", json_file.display());
         let json_txt = std::fs::read_to_string(&json_file)?;
         let new_json = obfuscate_jsontxt(&json_txt)?;
         std::fs::write(json_file, new_json)?;
+        count += 1;
     }
+    println!("obfuscated {} files", count);
     Ok(())
 }
 

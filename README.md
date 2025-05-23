@@ -9,6 +9,41 @@ A tool to partially hide json value (using unsecure pseudonimize / obfuscate alg
 - Idempotent and constant: `apply(a.json) == apply(apply(apply(.... (apply(a.json)))))`, so it could be used as part of pre-commit hook, build stage,...
 - **DO NOT** use it to encrypt secrets,...
 
+## Usage
+
+
+```bash
+❯ json-simple-obfuscator -h
+
+A tool to partially hide json value (using unsecure pseudonimize / obfuscate algo).
+
+Usage: json-simple-obfuscator [FILE]...
+
+Arguments:
+  [FILE]...  path of files to obfuscate
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+### Install
+
+Download the binary from the [release page](https://github.com/davidB/json-simple-obfuscator/releases).
+
+With cargo
+
+```bash
+cargo install json-simple-obfuscator
+```
+
+With mise
+
+```toml
+[tools]
+"ubi:davidB/json-simple-obfuscator" = "latest"
+```
+
 ## A simple algorithm
 
 ```json
