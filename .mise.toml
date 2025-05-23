@@ -85,3 +85,7 @@ run = [
 [tasks."ci"]
 depends = ["lint", "test", "deny"]
 description = "set of tasks run by CI"
+run = [
+    "mise bin-paths",
+    "cargo version -v",
+]
