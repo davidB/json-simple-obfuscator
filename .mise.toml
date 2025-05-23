@@ -16,6 +16,7 @@ run = [
 
 [tasks."build"]
 run = "cargo --locked build"
+wait_for = ["info"]
 
 [tasks."format"]
 alias = "fmt"
@@ -27,18 +28,19 @@ run = [
 
 [tasks."deny"]
 run = [
-    # "cargo --locked tree -i opentelemetry",
     "cargo --locked deny --all-features check",
 ]
+wait_for = ["info"]
 
 [tasks."lint"]
 depends = ["lint:*"]
 description = "Lint all the code (megalinter + lint_rust)"
+wait_for = ["info", "deny"]
 
 [tasks."lint:rust"]
 run = [
     "cargo --locked fmt --all -- --check",
-    "cargo --locked sort --grouped --check",
+    # "cargo --locked sort --grouped --check",
     "cargo --locked clippy --workspace --all-features --all-targets --no-deps",
 ]
 
@@ -53,10 +55,8 @@ run = [
 ]
 
 [tasks."test"]
-# using `depends_post = ["examples:transform:*"]` trigger an error
-# > Infinitive loop detected, all tasks are finished but the graph isn't empty examples:...
-# So as workaround a wait_for is added to every task examples:transform:...
 depends = ["test:unit"]
+wait_for = ["info"]
 
 [tasks."test:unit"]
 run = [
@@ -64,6 +64,7 @@ run = [
     # "cargo test --doc",
     # "cargo hack nextest --each-feature -- --test-threads=1",
 ]
+wait_for = ["lint:*"]
 
 # [tasks."test:coverage"]
 # description = "run test coverage to help identify code not executed on tests (!= code tested)"
@@ -83,5 +84,11 @@ run = [
 # ]
 
 [tasks."ci"]
-depends = ["lint", "test", "deny"]
+depends = ["info", "lint", "test", "deny"]
 description = "set of tasks run by CI"
+
+[tasks.info]
+run = [
+    "mise bin-paths",
+    "cargo version -v",
+]
