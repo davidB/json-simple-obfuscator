@@ -1,6 +1,10 @@
 [env]
 RUSTC_BOOTSTRAP= "1" # workaround to reduce cli full rebuild / conflict with rust-analyzer (see [VSCode Test Explorer regularly requires a full rebuild · Issue #17149 · rust-lang/rust-analyzer](https://github.com/rust-lang/rust-analyzer/issues/17149))
 
+[settings]
+experimental = true
+idiomatic_version_file_enable_tools = []
+
 [tools]
 rust = { version = "1.87.0", profile="minimal", components="rustfmt,clippy"} # the rust tool stack (with cargo, fmt, clippy) to build source
 "aqua:cargo-bins/cargo-binstall" = "1" # do not use cargo-binstall (it's a special name used by mise)
