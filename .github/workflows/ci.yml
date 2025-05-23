@@ -6,11 +6,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches:
-      - main
-      - master
-      - "releases/*"
-    ignore-branches:
+    branches-ignore:
       - "releaze-plz-*"
   workflow_dispatch:
 
