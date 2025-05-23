@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/davidB/json-simple-obfuscator/compare/0.2.0...0.2.1) - 2025-05-23
+
+### Other
+
+- update usage
+- tune release flow
+- do not run ci on releaze-plz-* branches
+
 ## [0.2.0](https://github.com/davidB/json-simple-obfuscator/compare/0.1.0...0.2.0) - 2025-05-23
 
 ### Added
