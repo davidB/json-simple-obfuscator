@@ -4,21 +4,29 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
+use cliclack::{outro, progress_bar};
 use serde_json::Value;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    input: Vec<PathBuf>,
+    /// path of files to obfuscate
+    file: Vec<PathBuf>,
 }
 
 pub fn main() -> Result<()> {
     let cli = Cli::parse();
-    for json_file in cli.input {
+    let count = cli.file.len() as u64;
+    let progress = progress_bar(count);
+    progress.start("Obfuscating files...");
+    for json_file in cli.file {
         let json_txt = std::fs::read_to_string(&json_file)?;
         let new_json = obfuscate_jsontxt(&json_txt)?;
         std::fs::write(json_file, new_json)?;
+        progress.inc(1);
     }
+    progress.stop(format!("Obfuscated {count} files"));
+    outro("Done!")?;
     Ok(())
 }
 
@@ -34,7 +42,6 @@ fn obfuscate_jsontxt(json_txt: &str) -> Result<String> {
     Ok(replace_all(&replacements, json_txt))
 }
 
-#[allow(clippy::min_ident_chars)]
 fn obfuscate_str(value: &str) -> String {
     value
         .chars()
