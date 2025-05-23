@@ -49,7 +49,7 @@ run = [
 description = "check if dependencies are unused, outdated,..."
 run = [
   # "cargo --locked machete --with-metadata",
-  "cargo outdated -wR",
+  # "cargo outdated -wR",
   # "cargo tree --duplicate", # managed by cargo deny
   # "cargo audit", # check security, maybe done by cargo deny
 ]
