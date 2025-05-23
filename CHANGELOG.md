@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/davidB/json-simple-obfuscator/compare/0.2.1...0.2.2) - 2025-05-23
+
+### Other
+
+- reduce the trigger of ci workflow
+- tune mise config (2)
+
 ## [0.2.1](https://github.com/davidB/json-simple-obfuscator/compare/0.2.0...0.2.1) - 2025-05-23
 
 ### Fixed
