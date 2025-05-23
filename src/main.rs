@@ -57,18 +57,25 @@ fn obfuscate_str(value: &str) -> String {
         .collect::<String>()
 }
 
+/// Collect all values that are sensitive (password, secret,...)
+/// by length so that during replacement, the longest first (in case of overlap)
 fn collect_sensitive_values(json: Value) -> Vec<String> {
     let mut values = Vec::new();
 
     if let Value::Object(obj) = json {
         for (key, value) in obj {
-            if (value.is_string() || value.is_number()) && is_sensitive(&key) {
-                values.push(value.to_string());
+            if is_sensitive(&key) {
+                match value {
+                    Value::String(s) => values.push(s),
+                    Value::Number(n) => values.push(n.to_string()),
+                    _ => {}
+                }
             } else {
                 values.extend(collect_sensitive_values(value));
             }
         }
     }
+    values.sort_by_key(|s| std::cmp::Reverse(s.len()));
     values
 }
 
@@ -80,6 +87,7 @@ fn is_sensitive(key: &str) -> bool {
         || lower.contains("phone")
         || lower.ends_with("name")
         || (lower == "user")
+        || (lower == "login")
         || (lower == "address")
         || lower.contains("email")
         || (lower == "id")
@@ -104,6 +112,30 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[rstest]
+    fn test_collect_sensitive_values() {
+        let input = indoc! {r#"
+            {
+                "a": "Hello",
+                "id": 123456,
+                "details": {
+                    "user": "johnD",
+                    "firstName": "John",
+                    "fullName": "John Doe",
+                    "url": "http://example.com/item/123456",
+                    "welcome": "Welcome John Doe"
+                }
+            }
+        "#};
+        let expected = vec![
+            "John Doe".to_string(),
+            "123456".to_string(),
+            "johnD".to_string(),
+            "John".to_string(),
+        ];
+        assert_eq!(collect_sensitive_values(serde_json::from_str(input).unwrap()), expected);
+    }
+
+    #[rstest]
     fn test_sample() {
         let input = indoc! {r#"
             {
@@ -111,8 +143,10 @@ mod tests {
                 "id": 123456,
                 "details": {
                     "user": "johnD",
-                    "name": "John Doe",
-                    "url": "http://example.com/item/123456"
+                    "firstName": "John",
+                    "fullName": "John Doe",
+                    "url": "http://example.com/item/123456",
+                    "welcome": "Welcome John Doe"
                 }
             }
         "#};
@@ -122,12 +156,15 @@ mod tests {
                 "id": 111111,
                 "details": {
                     "user": "aaaaA",
-                    "name": "Aaaa Aaa",
-                    "url": "http://example.com/item/111111"
+                    "firstName": "Aaaa",
+                    "fullName": "Aaaa Aaa",
+                    "url": "http://example.com/item/111111",
+                    "welcome": "Welcome Aaaa Aaa"
                 }
             }
         "#};
         assert_eq!(obfuscate_jsontxt(input).unwrap(), expected);
+        assert_eq!(obfuscate_jsontxt(expected).unwrap(), expected);
     }
 
     #[rstest]
