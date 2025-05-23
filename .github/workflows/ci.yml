@@ -5,6 +5,8 @@ name: ci
 
 on:
   pull_request:
+    branches-ignore:
+      - "releaze-plz-*"
   push:
     branches-ignore:
       - "releaze-plz-*"
