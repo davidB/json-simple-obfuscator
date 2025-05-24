@@ -23,7 +23,7 @@ post-announce-jobs = []
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = false
 # A GitHub repo to push Homebrew formulas to
-tap = "davidB/json-simple-obfuscator"
+tap = "davidB/homebrew-tap"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 

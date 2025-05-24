@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/davidB/json-simple
 <summary>Via homebrew</summary>
 
 ```bash
-brew install brew install davidB/json-simple-obfuscator/json-simple-obfuscator
+brew install brew install davidB/tap/json-simple-obfuscator
 ```
 </details>
 
