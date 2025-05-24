@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5](https://github.com/davidB/json-simple-obfuscator/compare/0.2.4...0.2.5) - 2025-05-24
+
+### Other
+
+- add support for X86_64 MacOS
+
 ## [0.2.4](https://github.com/davidB/json-simple-obfuscator/compare/0.2.3...0.2.4) - 2025-05-24
 
 ### Other
