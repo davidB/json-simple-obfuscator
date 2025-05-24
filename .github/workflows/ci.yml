@@ -41,9 +41,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: jdx/mise-action@v2
         with:
-          experimental: true
-      - run: mise install
-        shell: bash
+          cache: false
       - run: mise run --jobs 1 ci
         shell: bash
       - run: ${SCCACHE_PATH} --show-stats
