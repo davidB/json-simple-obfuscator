@@ -8,8 +8,8 @@ on:
   #   branches:
   #     - "!release-plz-*"
   push:
-    branches:
-      - "!release-plz-**"
+    branches-ignore:
+      - "release-plz-**"
   workflow_dispatch:
 
 concurrency:
