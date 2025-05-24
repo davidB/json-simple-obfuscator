@@ -38,18 +38,46 @@ Options:
 
 Download the binary from the [release page](https://github.com/davidB/json-simple-obfuscator/releases).
 
-With cargo
+<details>
+<summary>Via shell script</summary>
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/davidB/json-simple-obfuscator/releases/download/0.2.0/json-simple-obfuscator-installer.sh | sh
+```
+</details>
+
+<details>
+<summary>Via power shell script</summary>
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/davidB/json-simple-obfuscator/releases/download/0.2.0/json-simple-obfuscator-installer.ps1 | iex"
+```
+</details>
+
+<details>
+<summary>Via homebrew</summary>
+
+```bash
+brew install brew install davidB/json-simple-obfuscator/json-simple-obfuscator
+```
+</details>
+
+<details>
+<summary>Via cargo</summary>
 
 ```bash
 cargo install json-simple-obfuscator
 ```
+</details>
 
-With mise
+<details>
+<summary>Via mise</summary>
 
 ```toml
 [tools]
 "ubi:davidB/json-simple-obfuscator" = "latest"
 ```
+</details>
 
 ## A simple algorithm
 
