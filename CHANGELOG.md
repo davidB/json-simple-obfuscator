@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6](https://github.com/davidB/json-simple-obfuscator/compare/0.2.5...0.2.6) - 2025-08-15
+
+### Other
+
+- *(deps)* update actions/checkout action v5
+- renovate should not update release.yml
+- use megalinter flavor
+- *(deps)* update dependency rust to v1.89.0
+- *(deps)* update rust crate rstest to 0.26
+- *(deps)* update dependency rust to v1.88.0
+- *(deps)* update stefanzweifel/git-auto-commit-action action to v6
+
 ## [0.2.5](https://github.com/davidB/json-simple-obfuscator/compare/0.2.4...0.2.5) - 2025-05-24
 
 ### Other
