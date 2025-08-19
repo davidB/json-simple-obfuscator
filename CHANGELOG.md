@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7](https://github.com/davidB/json-simple-obfuscator/compare/0.2.6...0.2.7) - 2025-08-19
+
+### Other
+
+- *(deps)* update jdx/mise-action action to v3
+
 ## [0.2.6](https://github.com/davidB/json-simple-obfuscator/compare/0.2.5...0.2.6) - 2025-08-15
 
 ### Other
