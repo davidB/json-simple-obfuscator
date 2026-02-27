@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7](https://github.com/davidB/json-simple-obfuscator/compare/0.2.6...0.2.7) - 2026-02-27
+
+### Other
+
+- *(deps)* update actions/upload-artifact action to v7 ([#39](https://github.com/davidB/json-simple-obfuscator/pull/39))
+- *(deps)* update dependency rust to v1.93.1 ([#38](https://github.com/davidB/json-simple-obfuscator/pull/38))
+- *(deps)* update dependency rust to v1.92.0 ([#36](https://github.com/davidB/json-simple-obfuscator/pull/36))
+- *(deps)* update actions/upload-artifact action to v6 ([#37](https://github.com/davidB/json-simple-obfuscator/pull/37))
+- *(deps)* update peter-evans/create-pull-request action to v8 ([#35](https://github.com/davidB/json-simple-obfuscator/pull/35))
+- *(deps)* update actions/checkout action to v6 ([#34](https://github.com/davidB/json-simple-obfuscator/pull/34))
+- *(deps)* update dependency rust to v1.91.0
+- *(deps)* update actions/upload-artifact action to v5
+- *(deps)* update stefanzweifel/git-auto-commit-action action to v7
+- *(deps)* update oxsecurity/megalinter action to v9
+- *(deps)* update dependency rust to v1.90.0
+- *(deps)* update jdx/mise-action action to v3
+
 ## [0.2.6](https://github.com/davidB/json-simple-obfuscator/compare/0.2.5...0.2.6) - 2025-08-15
 
 ### Other
