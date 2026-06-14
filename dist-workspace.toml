@@ -6,7 +6,7 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0"
+cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -38,13 +38,13 @@ global = "ubuntu-latest"
 
 # buildjet could be used to build the binaries (faster, cheaper? than github's runners)
 # aarch64-unknown-linux-gnu = "buildjet-8vcpu-ubuntu-2204-arm" # "ubuntu-24.04-arm"
-aarch64-unknown-linux-musl = "buildjet-8vcpu-ubuntu-2204-arm" # "ubuntu-24.04-arm"
+# aarch64-unknown-linux-musl = "buildjet-8vcpu-ubuntu-2204-arm" # "ubuntu-24.04-arm"
 x86_64-unknown-linux-musl = "ubuntu-latest"
 
-[dist.github-custom-runners.aarch64-apple-darwin]
+# [dist.github-custom-runners.aarch64-apple-darwin]
 # Use ARM Mac runner to build ARM binary (not strictly required, but nice).
 # dist uses `macos-13` (Intel) by default and cross-compiles to ARM.
-runner = "macos-14"
+# runner = "macos-14"
 
 [dist.github-custom-runners.x86_64-unknown-linux-gnu]
 # # Lock Linux to minimum supported version (Ubuntu 18.04 / RHEL 8, glibc 2.28).
