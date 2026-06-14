@@ -129,8 +129,8 @@ becomes
 
 Feedback, PR and feature request are welcomes. By example:
 
-- Option to provide the list of sensitive fields
-- Option to exclude some field name form the sensitive pattern
+- ~~Option to provide the list of sensitive fields~~
+- ~~Option to exclude some field name form the sensitive pattern~~
 - Option to provide fixed replacement (using a lookup table)
 - Option to compute replacement for different alphabet, emoji, ...
 - Option to use random replacement (and break the idempotency)
