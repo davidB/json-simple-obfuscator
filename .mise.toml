@@ -30,6 +30,14 @@ run = [
   "cargo --locked sort --grouped",
 ]
 
+[tasks.autofix]
+description = "Auto-fix Rust linting issues"
+run = [
+  "cargo fix --allow-dirty --workspace --all-features --all-targets --profile test",
+  "cargo clippy --fix --allow-dirty --workspace --all-features --all-targets --no-deps --profile test",
+]
+depends_post = ["format"]
+
 [tasks."deny"]
 run = [
     "cargo --locked deny --all-features check",
