@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/davidB/json-simple-obfuscator/compare/0.3.1...0.4.0) - 2026-06-14
+
+### Added
+
+- add --field/-f and --no-default-fields CLI flags
+- add --replace/-r flag to force-obfuscate arbitrary values
+
+### Fixed
+
+- recurse into arrays when collecting sensitive values
+
+### Other
+
+- apply clippy suggestion
+- mark as done some possible enhancement in the README
+- add tests to avoid regression and validate issue about array handling
+
 ## [0.3.1](https://github.com/davidB/json-simple-obfuscator/compare/0.3.0...0.3.1) - 2026-06-14
 
 ### Fixed
