@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/davidB/json-simple-obfuscator/compare/0.2.8...0.3.0) - 2026-06-14
+
+### Added
+
+- ensure unique obfuscated values across all input files
+
+### Fixed
+
+- *(deps)* update
+
+### Other
+
+- update README
+- reformat + add task 'autofix'
+- *(deps)* update rust to v1.96.0 ([#50](https://github.com/davidB/json-simple-obfuscator/pull/50))
+- *(deps)* update rust to v1.95.0 ([#49](https://github.com/davidB/json-simple-obfuscator/pull/49))
+- *(deps)* update dependency rust to v1.95.0 ([#48](https://github.com/davidB/json-simple-obfuscator/pull/48))
+- *(deps)* update rust crate similar-asserts to v2 ([#46](https://github.com/davidB/json-simple-obfuscator/pull/46))
+
 ## [0.2.8](https://github.com/davidB/json-simple-obfuscator/compare/0.2.7...0.2.8) - 2026-03-19
 
 ### Fixed
