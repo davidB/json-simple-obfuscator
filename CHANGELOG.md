@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/davidB/json-simple-obfuscator/compare/0.4.0...0.4.1) - 2026-06-14
+
+### Fixed
+
+- prevent numeric IDs from corrupting unrelated field values
+
 ## [0.4.0](https://github.com/davidB/json-simple-obfuscator/compare/0.3.1...0.4.0) - 2026-06-14
 
 ### Added
