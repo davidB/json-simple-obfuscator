@@ -1,5 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -19,9 +20,22 @@ pub fn main() -> Result<()> {
     let count = cli.file.len() as u64;
     let progress = progress_bar(count);
     progress.start("Obfuscating files...");
-    for json_file in cli.file {
-        let json_txt = std::fs::read_to_string(&json_file)?;
-        let new_json = obfuscate_jsontxt(&json_txt)?;
+
+    // Pass 1: read all files, collect all sensitive values globally
+    let mut all_texts: Vec<(PathBuf, String)> = Vec::with_capacity(cli.file.len());
+    let mut all_values: Vec<String> = Vec::new();
+    for json_file in &cli.file {
+        let json_txt = std::fs::read_to_string(json_file)?;
+        all_values.extend(collect_sensitive_values(serde_json::from_str(&json_txt)?));
+        all_texts.push((json_file.clone(), json_txt));
+    }
+
+    // Build one deterministic mapping for all files
+    let mapping = build_mapping(all_values);
+
+    // Pass 2: apply mapping to each file
+    for (json_file, json_txt) in all_texts {
+        let new_json = obfuscate_jsontxt(&json_txt, &mapping)?;
         std::fs::write(json_file, new_json)?;
         progress.inc(1);
     }
@@ -30,16 +44,75 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn obfuscate_jsontxt(json_txt: &str) -> Result<String> {
-    let values = collect_sensitive_values(serde_json::from_str(json_txt)?);
-    let replacements = values
+fn build_mapping(all_values: impl IntoIterator<Item = String>) -> HashMap<String, String> {
+    let mut sorted: Vec<String> = all_values.into_iter().collect();
+    sorted.sort();
+    sorted.dedup();
+    let mut used: HashSet<String> = HashSet::new();
+    let mut mapping: HashMap<String, String> = HashMap::new();
+    for value in sorted {
+        let mut obfuscated = obfuscate_str(&value);
+        while used.contains(&obfuscated) {
+            obfuscated = increment_obfuscated(&obfuscated);
+        }
+        used.insert(obfuscated.clone());
+        mapping.insert(value, obfuscated);
+    }
+    mapping
+}
+
+fn obfuscate_jsontxt(json_txt: &str, mapping: &HashMap<String, String>) -> Result<String> {
+    // Use local sensitive-value order (longest first) to drive replacement order
+    let local_values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+    let replacements: Vec<(String, String)> = local_values
         .into_iter()
-        .map(|value| {
-            let obfuscated = obfuscate_str(&value);
-            (value, obfuscated)
-        })
-        .collect::<Vec<(String, String)>>();
+        .filter_map(|v| mapping.get(&v).map(|obf| (v, obf.clone())))
+        .collect();
     Ok(replace_all(&replacements, json_txt))
+}
+
+fn increment_obfuscated(s: &str) -> String {
+    let mut chars: Vec<char> = s.chars().collect();
+    let mut i = chars.len();
+    loop {
+        if i == 0 {
+            // Carry overflow: prepend a char matching the first alphanumeric class
+            let prefix = chars.iter().find(|c| c.is_alphanumeric()).map_or('1', |c| {
+                if c.is_ascii_digit() {
+                    '1'
+                } else if c.is_ascii_uppercase() {
+                    'A'
+                } else {
+                    'a'
+                }
+            });
+            chars.insert(0, prefix);
+            break;
+        }
+        i -= 1;
+        let c = chars[i];
+        if c.is_ascii_digit() {
+            if c < '9' {
+                chars[i] = (c as u8 + 1) as char;
+                break;
+            }
+            chars[i] = '1'; // wrap, carry
+        } else if c.is_ascii_lowercase() {
+            if c < 'z' {
+                chars[i] = (c as u8 + 1) as char;
+                break;
+            }
+            chars[i] = 'a'; // wrap, carry
+        } else if c.is_ascii_uppercase() {
+            if c < 'Z' {
+                chars[i] = (c as u8 + 1) as char;
+                break;
+            }
+            chars[i] = 'A'; // wrap, carry
+        }
+        // non-alphanumeric: skip, carry continues left
+    }
+    chars.into_iter().collect()
 }
 
 fn obfuscate_str(value: &str) -> String {
@@ -111,6 +184,12 @@ mod tests {
     use rstest::*;
     use similar_asserts::assert_eq;
 
+    fn obfuscate_single(json_txt: &str) -> Result<String> {
+        let values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+        let mapping = build_mapping(values);
+        obfuscate_jsontxt(json_txt, &mapping)
+    }
+
     #[rstest]
     fn test_collect_sensitive_values() {
         let input = indoc! {r#"
@@ -163,8 +242,36 @@ mod tests {
                 }
             }
         "#};
-        assert_eq!(obfuscate_jsontxt(input).unwrap(), expected);
-        assert_eq!(obfuscate_jsontxt(expected).unwrap(), expected);
+        assert_eq!(obfuscate_single(input).unwrap(), expected);
+        assert_eq!(obfuscate_single(expected).unwrap(), expected);
+    }
+
+    #[rstest]
+    fn test_no_collision() {
+        let input = indoc! {r#"
+            {
+                "user": "johnD",
+                "login": "janeD"
+            }
+        "#};
+        let result = obfuscate_single(input).unwrap();
+        // Both have shape "aaaaA" — must get distinct outputs
+        let v1_start = result.find("\"user\": \"").unwrap() + 9;
+        let v1_end = result[v1_start..].find('"').unwrap() + v1_start;
+        let v2_start = result.find("\"login\": \"").unwrap() + 10;
+        let v2_end = result[v2_start..].find('"').unwrap() + v2_start;
+        assert_ne!(&result[v1_start..v1_end], &result[v2_start..v2_end]);
+    }
+
+    #[rstest]
+    #[case("111", "112")]
+    #[case("119", "121")]
+    #[case("999", "1111")]
+    #[case("zzz", "aaaa")]
+    #[case("ZZZ", "AAAA")]
+    #[case("11.9", "12.1")]
+    fn test_increment_obfuscated(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(increment_obfuscated(input), expected);
     }
 
     #[rstest]
