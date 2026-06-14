@@ -1,5 +1,11 @@
 # json-simple-obfuscator
 
+[![CI](https://github.com/davidB/json-simple-obfuscator/actions/workflows/ci.yml/badge.svg)](https://github.com/davidB/json-simple-obfuscator/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/json-simple-obfuscator.svg)](https://crates.io/crates/json-simple-obfuscator)
+[![Crates.io Downloads](https://img.shields.io/crates/d/json-simple-obfuscator.svg)](https://crates.io/crates/json-simple-obfuscator)
+[![GitHub Downloads](https://img.shields.io/github/downloads/davidB/json-simple-obfuscator/total.svg)](https://github.com/davidB/json-simple-obfuscator/releases)
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
+
 A tool to partially hide json value (using unsecure pseudonimize / obfuscate algo).
 
 ## Goals / Use-cases
@@ -43,7 +49,7 @@ Download the binary from the [release page](https://github.com/davidB/json-simpl
 <summary>Via shell script</summary>
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/davidB/json-simple-obfuscator/releases/download/0.2.0/json-simple-obfuscator-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/davidB/json-simple-obfuscator/releases/latest/download/json-simple-obfuscator-installer.sh | sh
 ```
 </details>
 
@@ -51,7 +57,7 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/davidB/json-simple-obfu
 <summary>Via power shell script</summary>
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/davidB/json-simple-obfuscator/releases/download/0.2.0/json-simple-obfuscator-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/davidB/json-simple-obfuscator/releases/latest/download/json-simple-obfuscator-installer.ps1 | iex"
 ```
 </details>
 
@@ -59,7 +65,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/davidB/json-simple
 <summary>Via homebrew</summary>
 
 ```bash
-brew install brew install davidB/tap/json-simple-obfuscator
+brew install davidB/tap/json-simple-obfuscator
 ```
 </details>
 
