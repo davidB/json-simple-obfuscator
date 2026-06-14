@@ -135,18 +135,26 @@ fn obfuscate_str(value: &str) -> String {
 fn collect_sensitive_values(json: Value) -> Vec<String> {
     let mut values = Vec::new();
 
-    if let Value::Object(obj) = json {
-        for (key, value) in obj {
-            if is_sensitive(&key) {
-                match value {
-                    Value::String(s) => values.push(s),
-                    Value::Number(n) => values.push(n.to_string()),
-                    _ => {}
+    match json {
+        Value::Object(obj) => {
+            for (key, value) in obj {
+                if is_sensitive(&key) {
+                    match value {
+                        Value::String(s) => values.push(s),
+                        Value::Number(n) => values.push(n.to_string()),
+                        _ => {}
+                    }
+                } else {
+                    values.extend(collect_sensitive_values(value));
                 }
-            } else {
-                values.extend(collect_sensitive_values(value));
             }
         }
+        Value::Array(arr) => {
+            for item in arr {
+                values.extend(collect_sensitive_values(item));
+            }
+        }
+        _ => {}
     }
     values.sort_by_key(|s| std::cmp::Reverse(s.len()));
     values
