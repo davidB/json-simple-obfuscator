@@ -13,6 +13,10 @@ use serde_json::Value;
 struct Cli {
     /// path of files to obfuscate
     file: Vec<PathBuf>,
+
+    /// additional values to obfuscate (can be repeated)
+    #[arg(long, short = 'r')]
+    replace: Vec<String>,
 }
 
 pub fn main() -> Result<()> {
@@ -29,6 +33,9 @@ pub fn main() -> Result<()> {
         all_values.extend(collect_sensitive_values(serde_json::from_str(&json_txt)?));
         all_texts.push((json_file.clone(), json_txt));
     }
+
+    // Inject CLI-supplied values before building mapping
+    all_values.extend(cli.replace.iter().cloned());
 
     // Build one deterministic mapping for all files
     let mapping = build_mapping(all_values);
@@ -62,12 +69,10 @@ fn build_mapping(all_values: impl IntoIterator<Item = String>) -> HashMap<String
 }
 
 fn obfuscate_jsontxt(json_txt: &str, mapping: &HashMap<String, String>) -> Result<String> {
-    // Use local sensitive-value order (longest first) to drive replacement order
-    let local_values = collect_sensitive_values(serde_json::from_str(json_txt)?);
-    let replacements: Vec<(String, String)> = local_values
-        .into_iter()
-        .filter_map(|v| mapping.get(&v).map(|obf| (v, obf.clone())))
-        .collect();
+    let mut replacements: Vec<(String, String)> =
+        mapping.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    // longest first to avoid partial overlaps
+    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
     Ok(replace_all(&replacements, json_txt))
 }
 
@@ -194,6 +199,13 @@ mod tests {
 
     fn obfuscate_single(json_txt: &str) -> Result<String> {
         let values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+        let mapping = build_mapping(values);
+        obfuscate_jsontxt(json_txt, &mapping)
+    }
+
+    fn obfuscate_with_extra(json_txt: &str, extra: &[&str]) -> Result<String> {
+        let mut values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+        values.extend(extra.iter().map(|s| s.to_string()));
         let mapping = build_mapping(values);
         obfuscate_jsontxt(json_txt, &mapping)
     }
@@ -350,6 +362,22 @@ mod tests {
         let v2_start = result.find("\"login\": \"").unwrap() + 10;
         let v2_end = result[v2_start..].find('"').unwrap() + v2_start;
         assert_ne!(&result[v1_start..v1_end], &result[v2_start..v2_end]);
+    }
+
+    #[rstest]
+    #[case::non_sensitive_key(r#"{"foo": "my-secret"}"#, &["my-secret"], r#"{"foo": "aa-aaaaaa"}"#)]
+    #[case::mixed_auto_and_extra(
+        r#"{"user": "alice", "note": "call alice later"}"#,
+        &["call alice later"],
+        r#"{"user": "aaaaa", "note": "aaaa aaaaa aaaaa"}"#
+    )]
+    #[case::extra_already_collected(
+        r#"{"user": "alice"}"#,
+        &["alice"],
+        r#"{"user": "aaaaa"}"#
+    )]
+    fn test_replace_cli_values(#[case] json: &str, #[case] extra: &[&str], #[case] expected: &str) {
+        assert_eq!(obfuscate_with_extra(json, extra).unwrap(), expected);
     }
 
     #[rstest]
