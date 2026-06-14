@@ -205,10 +205,103 @@ fn is_sensitive(key: &str) -> bool {
         || key.ends_with("Id")
 }
 
+fn is_pure_numeric(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
+}
+
+fn is_numeric_boundary_prefix(b: u8) -> bool {
+    b == b'"' || b == b':' || b == b'/' || b.is_ascii_whitespace()
+}
+
+fn is_numeric_boundary_suffix(b: u8) -> bool {
+    b == b'"' || b == b',' || b == b'/' || b == b'}' || b == b']' || b.is_ascii_whitespace()
+}
+
+/// Replace `from` in `text` only when bounded by non-digit chars on both sides.
+/// Prevents numeric values like "32" from corrupting larger numbers like "70733220".
+fn replace_bounded_number(text: &str, from: &str, to: &str) -> String {
+    let from_len = from.len();
+    let text_bytes = text.as_bytes();
+    let mut result = String::with_capacity(text.len());
+    let mut start = 0;
+    while start < text.len() {
+        if let Some(pos) = text[start..].find(from) {
+            let abs_pos = start + pos;
+            let prefix_ok = if abs_pos > 0 {
+                text_bytes.get(abs_pos - 1).map_or(true, |&b| is_numeric_boundary_prefix(b))
+            } else {
+                true
+            };
+            let suffix_ok = text_bytes
+                .get(abs_pos + from_len)
+                .map_or(true, |&b| is_numeric_boundary_suffix(b));
+            if prefix_ok && suffix_ok {
+                result.push_str(&text[start..abs_pos]);
+                result.push_str(to);
+                start = abs_pos + from_len;
+            } else {
+                result.push_str(&text[start..abs_pos + 1]);
+                start = abs_pos + 1;
+            }
+        } else {
+            result.push_str(&text[start..]);
+            break;
+        }
+    }
+    result
+}
+
+fn is_word_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Replace `from` in `text` only at word boundaries.
+/// Prevents "app" from corrupting "application" while still replacing in URLs/messages.
+fn replace_whole_word(text: &str, from: &str, to: &str) -> String {
+    let from_bytes = from.as_bytes();
+    let from_len = from_bytes.len();
+    let text_bytes = text.as_bytes();
+    let from_starts_word = from_bytes.first().map_or(false, |&b| is_word_char(b));
+    let from_ends_word = from_bytes.last().map_or(false, |&b| is_word_char(b));
+    let mut result = String::with_capacity(text.len());
+    let mut start = 0;
+    while start < text.len() {
+        if let Some(pos) = text[start..].find(from) {
+            let abs_pos = start + pos;
+            let prefix_ok = !from_starts_word
+                || if abs_pos > 0 {
+                    text_bytes.get(abs_pos - 1).map_or(true, |&b| !is_word_char(b))
+                } else {
+                    true
+                };
+            let suffix_ok = !from_ends_word
+                || text_bytes
+                    .get(abs_pos + from_len)
+                    .map_or(true, |&b| !is_word_char(b));
+            if prefix_ok && suffix_ok {
+                result.push_str(&text[start..abs_pos]);
+                result.push_str(to);
+                start = abs_pos + from_len;
+            } else {
+                result.push_str(&text[start..abs_pos + 1]);
+                start = abs_pos + 1;
+            }
+        } else {
+            result.push_str(&text[start..]);
+            break;
+        }
+    }
+    result
+}
+
 fn replace_all(replacements: &[(String, String)], json_txt: &str) -> String {
     let mut new_json = json_txt.to_string();
     for (from, to) in replacements {
-        new_json = new_json.replace(from, to);
+        new_json = if is_pure_numeric(from) {
+            replace_bounded_number(&new_json, from, to)
+        } else {
+            replace_whole_word(&new_json, from, to)
+        };
     }
     new_json
 }
@@ -466,5 +559,70 @@ mod tests {
         let values =
             collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), false);
         assert!(values.is_empty());
+    }
+
+    // Numeric boundary: "32" from id must not corrupt a longer number like "70733220"
+    #[rstest]
+    fn test_numeric_no_corrupt_longer_number() {
+        let input = r#"{"id": 32, "resourceVersion": "70733220"}"#;
+        let result = obfuscate_single(input).unwrap();
+        assert!(result.contains("\"resourceVersion\": \"70733220\""), "resourceVersion corrupted: {result}");
+        assert!(result.contains("\"id\": 11"), "id not obfuscated: {result}");
+    }
+
+    // Numeric boundary: "30" from id must not corrupt ISO datetime "10:30:00" (colon is not allowed suffix)
+    #[rstest]
+    fn test_numeric_no_corrupt_datetime() {
+        let input = r#"{"id": 30, "timestamp": "2024-01-15T10:30:00Z"}"#;
+        let result = obfuscate_single(input).unwrap();
+        assert!(result.contains("\"timestamp\": \"2024-01-15T10:30:00Z\""), "timestamp corrupted: {result}");
+    }
+
+    // Whole-word: collected "app" must not corrupt "application"
+    #[rstest]
+    fn test_string_no_partial_word_match() {
+        let input = r#"{"name": "app", "description": "application info"}"#;
+        let result = obfuscate_single(input).unwrap();
+        assert!(result.contains("\"description\": \"application info\""), "description corrupted: {result}");
+    }
+
+    // Whole-word: collected login name must still replace inside URL path
+    #[rstest]
+    fn test_string_replaces_in_url_context() {
+        let input = r#"{"login": "alice", "url": "https://api.example.com/users/alice"}"#;
+        let result = obfuscate_single(input).unwrap();
+        assert!(!result.contains("/users/alice"), "alice not replaced in URL: {result}");
+        assert!(result.contains("https://api.example.com/users/"), "URL base corrupted: {result}");
+    }
+
+    #[rstest]
+    #[case("12345", "12345", "11111", true)]  // exact standalone number — must replace
+    #[case("70733220", "32", "11", false)]  // "32" inside longer number — must NOT replace
+    #[case("10:30:00", "30", "11", false)]  // "30" inside datetime component — suffix ":" not allowed
+    #[case(" 32 ", "32", "11", true)]       // standalone number in text — must replace
+    #[case("\"32\"", "32", "11", true)]     // JSON-quoted number — must replace
+    #[case(":32,", "32", "11", true)]       // compact JSON number — must replace
+    fn test_replace_bounded_number(#[case] text: &str, #[case] from: &str, #[case] to: &str, #[case] replaced: bool) {
+        let result = replace_bounded_number(text, from, to);
+        if replaced {
+            assert!(result.contains(to), "expected replacement in {text:?}: got {result:?}");
+            assert!(!result.contains(from), "original not removed in {text:?}: got {result:?}");
+        } else {
+            assert!(result.contains(from), "unexpected replacement in {text:?}: got {result:?}");
+        }
+    }
+
+    #[rstest]
+    #[case("application", "app", "xyz", false)]  // "app" inside word — must NOT replace
+    #[case("my app here", "app", "xyz", true)]    // standalone word — must replace
+    #[case("/users/alice", "alice", "bob", true)] // in URL path — must replace
+    #[case("\"alice\"", "alice", "bob", true)]    // JSON-quoted string — must replace
+    fn test_replace_whole_word(#[case] text: &str, #[case] from: &str, #[case] to: &str, #[case] replaced: bool) {
+        let result = replace_whole_word(text, from, to);
+        if replaced {
+            assert!(result.contains(to), "expected replacement in {text:?}: got {result:?}");
+        } else {
+            assert!(result.contains(from), "unexpected replacement in {text:?}: got {result:?}");
+        }
     }
 }
