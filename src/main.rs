@@ -17,6 +17,16 @@ struct Cli {
     /// additional values to obfuscate (can be repeated)
     #[arg(long, short = 'r')]
     replace: Vec<String>,
+
+    /// additional field names whose values are obfuscated (can be repeated, case-insensitive).
+    /// Built-in sensitive fields: contains password/secret/token/phone/email;
+    /// ends with name/_id/-id/Id; exact match user/login/address/id.
+    #[arg(long, short = 'f')]
+    field: Vec<String>,
+
+    /// disable built-in sensitive field detection (combine with --field to define an exact list)
+    #[arg(long)]
+    no_default_fields: bool,
 }
 
 pub fn main() -> Result<()> {
@@ -25,12 +35,20 @@ pub fn main() -> Result<()> {
     let progress = progress_bar(count);
     progress.start("Obfuscating files...");
 
+    let extra_fields: HashSet<String> =
+        cli.field.iter().map(|s| s.to_lowercase()).collect();
+    let use_default = !cli.no_default_fields;
+
     // Pass 1: read all files, collect all sensitive values globally
     let mut all_texts: Vec<(PathBuf, String)> = Vec::with_capacity(cli.file.len());
     let mut all_values: Vec<String> = Vec::new();
     for json_file in &cli.file {
         let json_txt = std::fs::read_to_string(json_file)?;
-        all_values.extend(collect_sensitive_values(serde_json::from_str(&json_txt)?));
+        all_values.extend(collect_sensitive_values(
+            serde_json::from_str(&json_txt)?,
+            &extra_fields,
+            use_default,
+        ));
         all_texts.push((json_file.clone(), json_txt));
     }
 
@@ -137,26 +155,32 @@ fn obfuscate_str(value: &str) -> String {
 
 /// Collect all values that are sensitive (password, secret,...)
 /// by length so that during replacement, the longest first (in case of overlap)
-fn collect_sensitive_values(json: Value) -> Vec<String> {
+fn collect_sensitive_values(
+    json: Value,
+    extra_fields: &HashSet<String>,
+    use_default: bool,
+) -> Vec<String> {
     let mut values = Vec::new();
 
     match json {
         Value::Object(obj) => {
             for (key, value) in obj {
-                if is_sensitive(&key) {
+                let sensitive = (use_default && is_sensitive(&key))
+                    || extra_fields.contains(&key.to_lowercase());
+                if sensitive {
                     match value {
                         Value::String(s) => values.push(s),
                         Value::Number(n) => values.push(n.to_string()),
                         _ => {}
                     }
                 } else {
-                    values.extend(collect_sensitive_values(value));
+                    values.extend(collect_sensitive_values(value, extra_fields, use_default));
                 }
             }
         }
         Value::Array(arr) => {
             for item in arr {
-                values.extend(collect_sensitive_values(item));
+                values.extend(collect_sensitive_values(item, extra_fields, use_default));
             }
         }
         _ => {}
@@ -198,13 +222,15 @@ mod tests {
     use similar_asserts::assert_eq;
 
     fn obfuscate_single(json_txt: &str) -> Result<String> {
-        let values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+        let values =
+            collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
         let mapping = build_mapping(values);
         obfuscate_jsontxt(json_txt, &mapping)
     }
 
     fn obfuscate_with_extra(json_txt: &str, extra: &[&str]) -> Result<String> {
-        let mut values = collect_sensitive_values(serde_json::from_str(json_txt)?);
+        let mut values =
+            collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
         values.extend(extra.iter().map(|s| s.to_string()));
         let mapping = build_mapping(values);
         obfuscate_jsontxt(json_txt, &mapping)
@@ -231,7 +257,10 @@ mod tests {
             "johnD".to_string(),
             "John".to_string(),
         ];
-        assert_eq!(collect_sensitive_values(serde_json::from_str(input).unwrap()), expected);
+        assert_eq!(
+            collect_sensitive_values(serde_json::from_str(input).unwrap(), &HashSet::new(), true),
+            expected
+        );
     }
 
     #[rstest]
@@ -250,7 +279,10 @@ mod tests {
     #[case::ends_with_camel_id(r#"{"userId": "u1"}"#, vec!["u1"])]
     fn test_collect_field_patterns(#[case] json: &str, #[case] expected: Vec<&str>) {
         let expected: Vec<String> = expected.into_iter().map(String::from).collect();
-        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+        assert_eq!(
+            collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), true),
+            expected
+        );
     }
 
     #[rstest]
@@ -259,7 +291,10 @@ mod tests {
     #[case::depth_3(r#"{"a": {"b": {"id": "v1"}}}"#, vec!["v1"])]
     fn test_collect_depths(#[case] json: &str, #[case] expected: Vec<&str>) {
         let expected: Vec<String> = expected.into_iter().map(String::from).collect();
-        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+        assert_eq!(
+            collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), true),
+            expected
+        );
     }
 
     #[rstest]
@@ -270,7 +305,10 @@ mod tests {
     #[case::bool(r#"{"id": true}"#, vec![])]
     fn test_collect_value_types(#[case] json: &str, #[case] expected: Vec<&str>) {
         let expected: Vec<String> = expected.into_iter().map(String::from).collect();
-        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+        assert_eq!(
+            collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), true),
+            expected
+        );
     }
 
     // BUG: collect_sensitive_values doesn't recurse into arrays — these fail
@@ -280,7 +318,10 @@ mod tests {
     #[case::depth_3_with_array(r#"{"a": {"items": [{"node_id": "abc123"}]}}"#, vec!["abc123"])]
     fn test_collect_with_arrays(#[case] json: &str, #[case] expected: Vec<&str>) {
         let expected: Vec<String> = expected.into_iter().map(String::from).collect();
-        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+        assert_eq!(
+            collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), true),
+            expected
+        );
     }
 
     // BUG: values inside array elements are not collected → not replaced in url fields
@@ -402,5 +443,29 @@ mod tests {
     #[case("John99", "Aaaa11")]
     fn test_obfuscate_str(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(obfuscate_str(input), expected);
+    }
+
+    #[rstest]
+    fn test_extra_field_collected() {
+        let json = r#"{"myCustomField": "secret-val", "other": "plain"}"#;
+        let extra: HashSet<String> = ["mycustomfield".to_string()].into();
+        let values = collect_sensitive_values(serde_json::from_str(json).unwrap(), &extra, true);
+        assert_eq!(values, vec!["secret-val".to_string()]);
+    }
+
+    #[rstest]
+    fn test_no_default_fields_only_extra() {
+        let json = r#"{"password": "should-stay", "myfield": "obfuscated"}"#;
+        let extra: HashSet<String> = ["myfield".to_string()].into();
+        let values = collect_sensitive_values(serde_json::from_str(json).unwrap(), &extra, false);
+        assert_eq!(values, vec!["obfuscated".to_string()]);
+    }
+
+    #[rstest]
+    fn test_no_default_fields_no_extra() {
+        let json = r#"{"password": "s3cr3t", "user": "alice"}"#;
+        let values =
+            collect_sensitive_values(serde_json::from_str(json).unwrap(), &HashSet::new(), false);
+        assert!(values.is_empty());
     }
 }

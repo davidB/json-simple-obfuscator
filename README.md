@@ -31,14 +31,17 @@ A tool to partially hide json value (using unsecure pseudonimize / obfuscate alg
 
 A tool to partially hide json value (using unsecure pseudonimize / obfuscate algo).
 
-Usage: json-simple-obfuscator [FILE]...
+Usage: json-simple-obfuscator [OPTIONS] [FILE]...
 
 Arguments:
   [FILE]...  path of files to obfuscate
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+  -r, --replace <REPLACE>  additional values to obfuscate (can be repeated)
+  -f, --field <FIELD>      additional field names whose values are obfuscated (can be repeated, case-insensitive). Built-in sensitive fields: contains password/secret/token/phone/email; ends with name/_id/-id/Id; exact match user/login/address/id
+      --no-default-fields  disable built-in sensitive field detection (combine with --field to define an exact list)
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 ### Install
