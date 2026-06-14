@@ -7,7 +7,8 @@ A tool to partially hide json value (using unsecure pseudonimize / obfuscate alg
 - Hide sensitive values into samples json used for test, demo
 - Hide values also when present as part of an other string
 - Idempotent and constant: `apply(a.json) == apply(apply(apply(.... (apply(a.json)))))`, so it could be used as part of pre-commit hook, build stage,...
-- **DO NOT** use it to encrypt secrets,...
+- Injective: distinct input values produce distinct output values, preserving references and foreign-key relationships across files
+- **DO NOT** use it to hide or to encrypt secrets,...
 
 ## Usage
 
@@ -75,7 +76,7 @@ cargo install json-simple-obfuscator
 
 ```toml
 [tools]
-"ubi:davidB/json-simple-obfuscator" = "latest"
+"github:davidB/json-simple-obfuscator" = "latest"
 ```
 </details>
 
@@ -107,12 +108,13 @@ becomes
 }
 ```
 
-1. Collect values (string or number) of "sensitive" fields.
-  the "sensitive" fields are field named(in lowercase): `id`, `_id`, `*token`, `*password`, `*secret`, `user`, `*name`, `
-2. For each value, compute the replacement value
-    - for number, replace every digit by `1` (preserve the number of digit, dot & comma)
-    - for string, replace lowercase by `a` and uppercase by `A`, digit by `1` (preserve other caracteres: )
-3. Search collected values, and replace by the computed replacement into the json as text (to preserve structure, order, comment for json5/jsonc, ...)
+1. Collect values (string or number) of "sensitive" fields across **all input files**.
+   Sensitive fields are those named (in lowercase): `id`, `_id`, `*token`, `*password`, `*secret`, `user`, `*name`, `*email`, `*phone`, `login`, `address`, `*Id`
+2. Sort all collected values alphabetically, then assign each a unique obfuscated replacement:
+    - Base replacement: digits → `1`, lowercase → `a`, uppercase → `A` (non-alphanumeric preserved)
+    - If the base is already taken, increment right-to-left within each character class (`1→2→…→9`, `a→b→…→z`, `A→B→…→Z`), carrying left on overflow; prepend a char if all positions are exhausted
+    - Sorting ensures the mapping is deterministic and reproducible for the same set of inputs
+3. Replace collected values in each file as text (preserves structure, order, comments for json5/jsonc, ...)
 
 ## Possible feature (on-demand)
 
