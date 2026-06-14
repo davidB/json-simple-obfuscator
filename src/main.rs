@@ -35,8 +35,7 @@ pub fn main() -> Result<()> {
     let progress = progress_bar(count);
     progress.start("Obfuscating files...");
 
-    let extra_fields: HashSet<String> =
-        cli.field.iter().map(|s| s.to_lowercase()).collect();
+    let extra_fields: HashSet<String> = cli.field.iter().map(|s| s.to_lowercase()).collect();
     let use_default = !cli.no_default_fields;
 
     // Pass 1: read all files, collect all sensitive values globally
@@ -60,7 +59,7 @@ pub fn main() -> Result<()> {
 
     // Pass 2: apply mapping to each file
     for (json_file, json_txt) in all_texts {
-        let new_json = obfuscate_jsontxt(&json_txt, &mapping)?;
+        let new_json = obfuscate_jsontxt(&json_txt, &mapping);
         std::fs::write(json_file, new_json)?;
         progress.inc(1);
     }
@@ -86,12 +85,12 @@ fn build_mapping(all_values: impl IntoIterator<Item = String>) -> HashMap<String
     mapping
 }
 
-fn obfuscate_jsontxt(json_txt: &str, mapping: &HashMap<String, String>) -> Result<String> {
+fn obfuscate_jsontxt(json_txt: &str, mapping: &HashMap<String, String>) -> String {
     let mut replacements: Vec<(String, String)> =
         mapping.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     // longest first to avoid partial overlaps
-    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
-    Ok(replace_all(&replacements, json_txt))
+    replacements.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+    replace_all(&replacements, json_txt)
 }
 
 fn increment_obfuscated(s: &str) -> String {
@@ -225,15 +224,15 @@ mod tests {
         let values =
             collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
         let mapping = build_mapping(values);
-        obfuscate_jsontxt(json_txt, &mapping)
+        Ok(obfuscate_jsontxt(json_txt, &mapping))
     }
 
     fn obfuscate_with_extra(json_txt: &str, extra: &[&str]) -> Result<String> {
         let mut values =
             collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
-        values.extend(extra.iter().map(|s| s.to_string()));
+        values.extend(extra.iter().map(std::string::ToString::to_string));
         let mapping = build_mapping(values);
-        obfuscate_jsontxt(json_txt, &mapping)
+        Ok(obfuscate_jsontxt(json_txt, &mapping))
     }
 
     #[rstest]
