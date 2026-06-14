@@ -215,6 +215,87 @@ mod tests {
     }
 
     #[rstest]
+    #[case::contains_password(r#"{"password_hash": "s3cr3t"}"#, vec!["s3cr3t"])]
+    #[case::contains_secret(r#"{"client_secret": "abc"}"#, vec!["abc"])]
+    #[case::contains_token(r#"{"access_token": "tok123"}"#, vec!["tok123"])]
+    #[case::contains_phone(r#"{"phone_number": "555-1234"}"#, vec!["555-1234"])]
+    #[case::ends_with_name(r#"{"firstName": "John"}"#, vec!["John"])]
+    #[case::exact_user(r#"{"user": "alice"}"#, vec!["alice"])]
+    #[case::exact_login(r#"{"login": "alice"}"#, vec!["alice"])]
+    #[case::exact_address(r#"{"address": "123 Main St"}"#, vec!["123 Main St"])]
+    #[case::contains_email(r#"{"email": "a@b.com"}"#, vec!["a@b.com"])]
+    #[case::exact_id(r#"{"id": 42}"#, vec!["42"])]
+    #[case::ends_with_underscore_id(r#"{"node_id": "abc123"}"#, vec!["abc123"])]
+    #[case::ends_with_dash_id(r#"{"project-id": "p1"}"#, vec!["p1"])]
+    #[case::ends_with_camel_id(r#"{"userId": "u1"}"#, vec!["u1"])]
+    fn test_collect_field_patterns(#[case] json: &str, #[case] expected: Vec<&str>) {
+        let expected: Vec<String> = expected.into_iter().map(String::from).collect();
+        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+    }
+
+    #[rstest]
+    #[case::depth_1(r#"{"id": "v1"}"#, vec!["v1"])]
+    #[case::depth_2(r#"{"wrap": {"id": "v1"}}"#, vec!["v1"])]
+    #[case::depth_3(r#"{"a": {"b": {"id": "v1"}}}"#, vec!["v1"])]
+    fn test_collect_depths(#[case] json: &str, #[case] expected: Vec<&str>) {
+        let expected: Vec<String> = expected.into_iter().map(String::from).collect();
+        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+    }
+
+    #[rstest]
+    #[case::string(r#"{"id": "str-val"}"#, vec!["str-val"])]
+    #[case::number(r#"{"id": 42}"#, vec!["42"])]
+    #[case::object(r#"{"id": {"nested": "x"}}"#, vec![])]
+    #[case::null(r#"{"id": null}"#, vec![])]
+    #[case::bool(r#"{"id": true}"#, vec![])]
+    fn test_collect_value_types(#[case] json: &str, #[case] expected: Vec<&str>) {
+        let expected: Vec<String> = expected.into_iter().map(String::from).collect();
+        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+    }
+
+    // BUG: collect_sensitive_values doesn't recurse into arrays — these fail
+    #[rstest]
+    #[case::array_under_non_sensitive_key(r#"{"users": [{"login": "octocat"}]}"#, vec!["octocat"])]
+    #[case::root_array(r#"[{"id": 12345}]"#, vec!["12345"])]
+    #[case::depth_3_with_array(r#"{"a": {"items": [{"node_id": "abc123"}]}}"#, vec!["abc123"])]
+    fn test_collect_with_arrays(#[case] json: &str, #[case] expected: Vec<&str>) {
+        let expected: Vec<String> = expected.into_iter().map(String::from).collect();
+        assert_eq!(collect_sensitive_values(serde_json::from_str(json).unwrap()), expected);
+    }
+
+    // BUG: values inside array elements are not collected → not replaced in url fields
+    #[rstest]
+    fn test_obfuscation_in_array() {
+        let input = indoc! {r#"
+            {
+                "users": [
+                    {
+                        "id": 12345,
+                        "node_id": "MDQ6VXNlcjEyMzQ1",
+                        "login": "octocat",
+                        "url": "https://api.github.com/users/octocat",
+                        "repos_url": "https://api.github.com/users/octocat/repos"
+                    }
+                ]
+            }
+        "#};
+        let expected = indoc! {r#"
+            {
+                "users": [
+                    {
+                        "id": 11111,
+                        "node_id": "AAA1AAAaaaAaAaA1",
+                        "login": "aaaaaaa",
+                        "url": "https://api.github.com/users/aaaaaaa",
+                        "repos_url": "https://api.github.com/users/aaaaaaa/repos"
+                    }
+                ]
+            }
+        "#};
+        assert_eq!(obfuscate_single(input).unwrap(), expected);
+    }
+
+    #[rstest]
     fn test_sample() {
         let input = indoc! {r#"
             {
