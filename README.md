@@ -44,9 +44,20 @@ Options:
   -r, --replace <REPLACE>  additional values to obfuscate (can be repeated)
   -f, --field <FIELD>      additional field names whose values are obfuscated (can be repeated, case-insensitive). Built-in sensitive fields: contains password/secret/token/phone/email; ends with name/_id/-id/Id; exact match user/login/address/id
       --no-default-fields  disable built-in sensitive field detection (combine with --field to define an exact list)
+  -s, --stem <STEM>        write output to a sibling file with this stem inserted before the extension (e.g. `-s pseudo` => foo.json -> foo.pseudo.json) instead of rewriting in place. Existing destination is overwritten
   -h, --help               Print help
   -V, --version            Print version
 ```
+
+By default each input file is rewritten **in place**. Pass `--stem <STEM>` to
+keep the original untouched and write the obfuscated output to a sibling file
+with the stem inserted before the extension:
+
+```bash
+❯ json-simple-obfuscator --stem pseudo foo.json   # writes foo.pseudo.json
+```
+
+See [`examples/data-01/`](examples/data-01/) for a runnable sample.
 
 ### Install
 

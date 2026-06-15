@@ -95,6 +95,10 @@ wait_for = ["lint:*"]
 #     "cargo run",
 # ]
 
+[tasks."example:data-01"]
+description = "Run the obfuscator on examples/data-01 producing input.pseudo.json"
+run = "cargo --locked run -- --stem pseudo examples/data-01/input.json"
+
 [tasks."ci"]
 depends = ["info", "lint", "test", "deny"]
 description = "set of tasks run by CI"

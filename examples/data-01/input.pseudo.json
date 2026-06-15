@@ -1,0 +1,16 @@
+{
+  "id": 1111,
+  "status": "active",
+  "userName": "aaaaA",
+  "email": "aaaa.aaa@aaaaaaa.aaa",
+  "password": "A1aa1a-Aa11!",
+  "profile": {
+    "fullName": "Aaaa Aaa",
+    "phone": "+1-111-1111",
+    "address": "111A Aaaaa Aaaaaa, Aaaaaa"
+  },
+  "credentials": [
+    { "token": "aaa_aaa111AAA", "secret": "aa_aaaa_111111" }
+  ],
+  "notes": "Welcome Aaaa Aaa, please keep A1aa1a-Aa11! safe."
+}

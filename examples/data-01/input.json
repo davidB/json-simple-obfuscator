@@ -1,0 +1,16 @@
+{
+  "id": 1042,
+  "status": "active",
+  "userName": "johnD",
+  "email": "john.doe@example.com",
+  "password": "S3cr3t-Pa55!",
+  "profile": {
+    "fullName": "John Doe",
+    "phone": "+1-555-0142",
+    "address": "221B Baker Street, London"
+  },
+  "credentials": [
+    { "token": "tok_abc123XYZ", "secret": "sk_live_998877" }
+  ],
+  "notes": "Welcome John Doe, please keep S3cr3t-Pa55! safe."
+}

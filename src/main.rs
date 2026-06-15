@@ -1,7 +1,7 @@
 #![allow(clippy::missing_errors_doc)]
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use aho_corasick::{AhoCorasick, Input, MatchKind};
 use anyhow::Result;
@@ -28,6 +28,12 @@ struct Cli {
     /// disable built-in sensitive field detection (combine with --field to define an exact list)
     #[arg(long)]
     no_default_fields: bool,
+
+    /// write output to a sibling file with this stem inserted before the
+    /// extension (e.g. `-s pseudo` => foo.json -> foo.pseudo.json) instead of
+    /// rewriting in place. Existing destination is overwritten.
+    #[arg(long, short = 's')]
+    stem: Option<String>,
 }
 
 pub fn main() -> Result<()> {
@@ -73,9 +79,11 @@ pub fn main() -> Result<()> {
     bar.start("Obfuscating files...");
     // Build the matcher once and reuse across all files.
     let replacer = Replacer::new(&mapping)?;
+    let stem = cli.stem.as_deref();
     for (json_file, json_txt) in all_texts {
         let new_json = replacer.replace(&json_txt);
-        std::fs::write(json_file, new_json)?;
+        let dest = output_path(&json_file, stem);
+        std::fs::write(dest, new_json)?;
         bar.inc(1);
     }
     bar.stop(format!("Obfuscated {count} files in {:.1?}", t.elapsed()));
@@ -169,6 +177,22 @@ fn obfuscate_str(value: &str) -> String {
             }
         })
         .collect::<String>()
+}
+
+/// Resolve the destination path for an input file.
+/// When `stem` is `None`, write in place (return the input path unchanged).
+/// Otherwise insert `stem` before the final extension
+/// (e.g. `foo.json` + `pseudo` => `foo.pseudo.json`, `data` + `pseudo` => `data.pseudo`).
+fn output_path(input: &Path, stem: Option<&str>) -> PathBuf {
+    let Some(stem) = stem else {
+        return input.to_path_buf();
+    };
+    let file_stem = input.file_stem().unwrap_or_default().to_string_lossy();
+    let new_name = match input.extension() {
+        Some(ext) => format!("{file_stem}.{stem}.{}", ext.to_string_lossy()),
+        None => format!("{file_stem}.{stem}"),
+    };
+    input.with_file_name(new_name)
 }
 
 /// Collect all values that are sensitive (password, secret,...)
@@ -370,6 +394,16 @@ mod tests {
         values.dedup();
         let mapping = build_mapping(values, || {});
         Ok(obfuscate_jsontxt(json_txt, &mapping))
+    }
+
+    #[rstest]
+    #[case("foo.json", None, "foo.json")]
+    #[case("foo.json", Some("pseudo"), "foo.pseudo.json")]
+    #[case("data", Some("pseudo"), "data.pseudo")]
+    #[case("dir/sub/foo.json", Some("pseudo"), "dir/sub/foo.pseudo.json")]
+    #[case("foo.tar.json", Some("pseudo"), "foo.tar.pseudo.json")]
+    fn test_output_path(#[case] input: &str, #[case] stem: Option<&str>, #[case] expected: &str) {
+        assert_eq!(output_path(Path::new(input), stem), PathBuf::from(expected));
     }
 
     #[rstest]
