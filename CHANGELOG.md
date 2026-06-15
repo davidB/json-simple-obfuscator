@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/davidB/json-simple-obfuscator/compare/0.4.1...0.5.0) - 2026-06-15
+
+### Added
+
+- *(ui)* split obfuscation feedback into 3 timed steps
+
+### Other
+
+- single-pass Aho-Corasick replacement
+
 ## [0.4.1](https://github.com/davidB/json-simple-obfuscator/compare/0.4.0...0.4.1) - 2026-06-14
 
 ### Fixed
