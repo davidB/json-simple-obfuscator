@@ -3,6 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use aho_corasick::{AhoCorasick, Input, MatchKind};
 use anyhow::Result;
 use clap::Parser;
 use cliclack::{outro, progress_bar};
@@ -70,8 +71,10 @@ pub fn main() -> Result<()> {
     let t = std::time::Instant::now();
     let bar = progress_bar(count);
     bar.start("Obfuscating files...");
+    // Build the matcher once and reuse across all files.
+    let replacer = Replacer::new(&mapping)?;
     for (json_file, json_txt) in all_texts {
-        let new_json = obfuscate_jsontxt(&json_txt, &mapping);
+        let new_json = replacer.replace(&json_txt);
         std::fs::write(json_file, new_json)?;
         bar.inc(1);
     }
@@ -102,12 +105,11 @@ fn build_mapping(
     mapping
 }
 
+#[cfg(test)]
 fn obfuscate_jsontxt(json_txt: &str, mapping: &HashMap<String, String>) -> String {
-    let mut replacements: Vec<(String, String)> =
-        mapping.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-    // longest first to avoid partial overlaps
-    replacements.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
-    replace_all(&replacements, json_txt)
+    // Build a throwaway matcher; the multi-file path uses `Replacer::new` directly
+    // and reuses one matcher across files.
+    Replacer::new(mapping).map_or_else(|_| json_txt.to_string(), |r| r.replace(json_txt))
 }
 
 fn increment_obfuscated(s: &str) -> String {
@@ -234,90 +236,114 @@ fn is_numeric_boundary_suffix(b: u8) -> bool {
     b == b'"' || b == b',' || b == b'/' || b == b'}' || b == b']' || b.is_ascii_whitespace()
 }
 
-/// Replace `from` in `text` only when bounded by non-digit chars on both sides.
-/// Prevents numeric values like "32" from corrupting larger numbers like "70733220".
-fn replace_bounded_number(text: &str, from: &str, to: &str) -> String {
-    let from_len = from.len();
-    let text_bytes = text.as_bytes();
-    let mut result = String::with_capacity(text.len());
-    let mut start = 0;
-    while start < text.len() {
-        if let Some(pos) = text[start..].find(from) {
-            let abs_pos = start + pos;
-            let prefix_ok = if abs_pos > 0 {
-                text_bytes.get(abs_pos - 1).is_none_or(|&b| is_numeric_boundary_prefix(b))
-            } else {
-                true
-            };
-            let suffix_ok =
-                text_bytes.get(abs_pos + from_len).is_none_or(|&b| is_numeric_boundary_suffix(b));
-            if prefix_ok && suffix_ok {
-                result.push_str(&text[start..abs_pos]);
-                result.push_str(to);
-                start = abs_pos + from_len;
-            } else {
-                result.push_str(&text[start..=abs_pos]);
-                start = abs_pos + 1;
-            }
-        } else {
-            result.push_str(&text[start..]);
-            break;
-        }
-    }
-    result
-}
-
 fn is_word_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
 }
 
-/// Replace `from` in `text` only at word boundaries.
-/// Prevents "app" from corrupting "application" while still replacing in URLs/messages.
-fn replace_whole_word(text: &str, from: &str, to: &str) -> String {
-    let from_bytes = from.as_bytes();
-    let from_len = from_bytes.len();
-    let text_bytes = text.as_bytes();
-    let from_starts_word = from_bytes.first().is_some_and(|&b| is_word_char(b));
-    let from_ends_word = from_bytes.last().is_some_and(|&b| is_word_char(b));
-    let mut result = String::with_capacity(text.len());
-    let mut start = 0;
-    while start < text.len() {
-        if let Some(pos) = text[start..].find(from) {
-            let abs_pos = start + pos;
-            let prefix_ok = !from_starts_word
-                || if abs_pos > 0 {
-                    text_bytes.get(abs_pos - 1).is_none_or(|&b| !is_word_char(b))
-                } else {
-                    true
-                };
-            let suffix_ok = !from_ends_word
-                || text_bytes.get(abs_pos + from_len).is_none_or(|&b| !is_word_char(b));
-            if prefix_ok && suffix_ok {
-                result.push_str(&text[start..abs_pos]);
-                result.push_str(to);
-                start = abs_pos + from_len;
-            } else {
-                result.push_str(&text[start..=abs_pos]);
-                start = abs_pos + 1;
-            }
-        } else {
-            result.push_str(&text[start..]);
-            break;
-        }
-    }
-    result
+/// Per-pattern boundary rule + replacement text, indexed by Aho-Corasick pattern id.
+struct ReplMeta {
+    to: String,
+    is_numeric: bool,
+    starts_word: bool,
+    ends_word: bool,
 }
 
-fn replace_all(replacements: &[(String, String)], json_txt: &str) -> String {
-    let mut new_json = json_txt.to_string();
-    for (from, to) in replacements {
-        new_json = if is_pure_numeric(from) {
-            replace_bounded_number(&new_json, from, to)
-        } else {
-            replace_whole_word(&new_json, from, to)
-        };
+/// Single-pass, boundary-aware replacer.
+///
+/// Builds one Aho-Corasick automaton (leftmost-longest) over all `from` keys and
+/// reuses it across every file, so the cost is `~ files × file_size` instead of
+/// `files × unique_values × file_size`. The numeric / word boundary rules from
+/// `replace_bounded_number` / `replace_whole_word` are applied at each candidate
+/// match before it is accepted.
+struct Replacer {
+    ac: AhoCorasick,
+    meta: Vec<ReplMeta>,
+}
+
+impl Replacer {
+    fn new(mapping: &HashMap<String, String>) -> Result<Self> {
+        let mut froms: Vec<String> = Vec::with_capacity(mapping.len());
+        let mut meta: Vec<ReplMeta> = Vec::with_capacity(mapping.len());
+        for (from, to) in mapping {
+            // Empty keys would match everywhere; skip them.
+            if from.is_empty() {
+                continue;
+            }
+            let bytes = from.as_bytes();
+            meta.push(ReplMeta {
+                to: to.clone(),
+                is_numeric: is_pure_numeric(from),
+                starts_word: bytes.first().is_some_and(|&b| is_word_char(b)),
+                ends_word: bytes.last().is_some_and(|&b| is_word_char(b)),
+            });
+            froms.push(from.clone());
+        }
+        // Leftmost-longest mirrors the old "longest first" ordering and picks the
+        // longest key at each position.
+        let ac = AhoCorasick::builder().match_kind(MatchKind::LeftmostLongest).build(&froms)?;
+        Ok(Self { ac, meta })
     }
-    new_json
+
+    fn boundary_ok(&self, pid: usize, bytes: &[u8], start: usize, end: usize) -> bool {
+        let m = &self.meta[pid];
+        if m.is_numeric {
+            let prefix_ok = start == 0 || is_numeric_boundary_prefix(bytes[start - 1]);
+            let suffix_ok = end >= bytes.len() || is_numeric_boundary_suffix(bytes[end]);
+            prefix_ok && suffix_ok
+        } else {
+            let prefix_ok = !m.starts_word || start == 0 || !is_word_char(bytes[start - 1]);
+            let suffix_ok = !m.ends_word || end >= bytes.len() || !is_word_char(bytes[end]);
+            prefix_ok && suffix_ok
+        }
+    }
+
+    /// Find the next accepted replacement at or after `from`: the leftmost start
+    /// having any boundary-valid match, choosing the longest valid key at that
+    /// start. Failed starts (longest match rejected, no shorter key valid) are
+    /// skipped, mirroring the old chained "longest first then shorter" behaviour.
+    fn find_replacement(
+        &self,
+        text: &str,
+        bytes: &[u8],
+        mut from: usize,
+    ) -> Option<(usize, usize, usize)> {
+        let len = text.len();
+        while from < len {
+            let mut win_end = len;
+            let mut leftmost_start = None;
+            while let Some(m) = self.ac.find(Input::new(text).span(from..win_end)) {
+                let (start, end, pid) = (m.start(), m.end(), m.pattern().as_usize());
+                leftmost_start = Some(start);
+                if self.boundary_ok(pid, bytes, start, end) {
+                    return Some((start, end, pid));
+                }
+                // Longest match here was rejected; shrink the window to try shorter
+                // keys at the same start.
+                win_end = end - 1;
+                if win_end <= start {
+                    break;
+                }
+            }
+            match leftmost_start {
+                Some(start) => from = start + 1,
+                None => return None,
+            }
+        }
+        None
+    }
+
+    fn replace(&self, text: &str) -> String {
+        let bytes = text.as_bytes();
+        let mut result = String::with_capacity(text.len());
+        let mut cursor = 0;
+        while let Some((start, end, pid)) = self.find_replacement(text, bytes, cursor) {
+            result.push_str(&text[cursor..start]);
+            result.push_str(&self.meta[pid].to);
+            cursor = end;
+        }
+        result.push_str(&text[cursor..]);
+        result
+    }
 }
 
 #[cfg(test)]
@@ -622,6 +648,13 @@ mod tests {
         assert!(result.contains("https://api.example.com/users/"), "URL base corrupted: {result}");
     }
 
+    /// Run the production `Replacer` with a single `from`→`to` entry.
+    fn replace_one(text: &str, from: &str, to: &str) -> String {
+        let mapping = HashMap::from([(from.to_string(), to.to_string())]);
+        Replacer::new(&mapping).unwrap().replace(text)
+    }
+
+    // Numeric boundary contract, exercised through the single-pass `Replacer`.
     #[rstest]
     #[case("12345", "12345", "11111", true)] // exact standalone number — must replace
     #[case("70733220", "32", "11", false)] // "32" inside longer number — must NOT replace
@@ -629,13 +662,13 @@ mod tests {
     #[case(" 32 ", "32", "11", true)] // standalone number in text — must replace
     #[case("\"32\"", "32", "11", true)] // JSON-quoted number — must replace
     #[case(":32,", "32", "11", true)] // compact JSON number — must replace
-    fn test_replace_bounded_number(
+    fn test_replacer_bounded_number(
         #[case] text: &str,
         #[case] from: &str,
         #[case] to: &str,
         #[case] replaced: bool,
     ) {
-        let result = replace_bounded_number(text, from, to);
+        let result = replace_one(text, from, to);
         if replaced {
             assert!(result.contains(to), "expected replacement in {text:?}: got {result:?}");
             assert!(!result.contains(from), "original not removed in {text:?}: got {result:?}");
@@ -644,22 +677,38 @@ mod tests {
         }
     }
 
+    // Word boundary contract, exercised through the single-pass `Replacer`.
     #[rstest]
     #[case("application", "app", "xyz", false)] // "app" inside word — must NOT replace
     #[case("my app here", "app", "xyz", true)] // standalone word — must replace
     #[case("/users/alice", "alice", "bob", true)] // in URL path — must replace
     #[case("\"alice\"", "alice", "bob", true)] // JSON-quoted string — must replace
-    fn test_replace_whole_word(
+    fn test_replacer_whole_word(
         #[case] text: &str,
         #[case] from: &str,
         #[case] to: &str,
         #[case] replaced: bool,
     ) {
-        let result = replace_whole_word(text, from, to);
+        let result = replace_one(text, from, to);
         if replaced {
             assert!(result.contains(to), "expected replacement in {text:?}: got {result:?}");
         } else {
             assert!(result.contains(from), "unexpected replacement in {text:?}: got {result:?}");
         }
+    }
+
+    // Multi-key single pass: longest-first wins, and a shorter key still applies
+    // where the longer one is boundary-rejected.
+    #[rstest]
+    fn test_replacer_leftmost_longest() {
+        let mapping = HashMap::from([
+            ("john".to_string(), "XXXX".to_string()),
+            ("john.doe@x.com".to_string(), "YYYY".to_string()),
+        ]);
+        let replacer = Replacer::new(&mapping).unwrap();
+        // Standalone long value: longest key wins.
+        assert_eq!(replacer.replace("\"john.doe@x.com\""), "\"YYYY\"");
+        // Long key boundary-rejected (suffix word char) → shorter key applies.
+        assert_eq!(replacer.replace("john.doe@x.comextra"), "XXXX.doe@x.comextra");
     }
 }
