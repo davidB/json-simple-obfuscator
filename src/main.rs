@@ -32,13 +32,14 @@ struct Cli {
 pub fn main() -> Result<()> {
     let cli = Cli::parse();
     let count = cli.file.len() as u64;
-    let progress = progress_bar(count);
-    progress.start("Obfuscating files...");
 
     let extra_fields: HashSet<String> = cli.field.iter().map(|s| s.to_lowercase()).collect();
     let use_default = !cli.no_default_fields;
 
-    // Pass 1: read all files, collect all sensitive values globally
+    // Step 1: read all files, collect all sensitive values globally
+    let t = std::time::Instant::now();
+    let bar = progress_bar(count);
+    bar.start("Collecting values...");
     let mut all_texts: Vec<(PathBuf, String)> = Vec::with_capacity(cli.file.len());
     let mut all_values: Vec<String> = Vec::new();
     for json_file in &cli.file {
@@ -49,38 +50,54 @@ pub fn main() -> Result<()> {
             use_default,
         ));
         all_texts.push((json_file.clone(), json_txt));
+        bar.inc(1);
     }
-
     // Inject CLI-supplied values before building mapping
     all_values.extend(cli.replace.iter().cloned());
+    let n_values = all_values.len();
+    bar.stop(format!("Collected {n_values} values from {count} files in {:.1?}", t.elapsed()));
 
-    // Build one deterministic mapping for all files
-    let mapping = build_mapping(all_values);
+    // Step 2: build one deterministic mapping for all collected values
+    let t = std::time::Instant::now();
+    all_values.sort();
+    all_values.dedup();
+    let bar = progress_bar(all_values.len() as u64);
+    bar.start("Computing replacements...");
+    let mapping = build_mapping(all_values, || bar.inc(1));
+    bar.stop(format!("Computed {} replacements in {:.1?}", mapping.len(), t.elapsed()));
 
-    // Pass 2: apply mapping to each file
+    // Step 3: apply mapping to each file
+    let t = std::time::Instant::now();
+    let bar = progress_bar(count);
+    bar.start("Obfuscating files...");
     for (json_file, json_txt) in all_texts {
         let new_json = obfuscate_jsontxt(&json_txt, &mapping);
         std::fs::write(json_file, new_json)?;
-        progress.inc(1);
+        bar.inc(1);
     }
-    progress.stop(format!("Obfuscated {count} files"));
+    bar.stop(format!("Obfuscated {count} files in {:.1?}", t.elapsed()));
+
     outro("Done!")?;
     Ok(())
 }
 
-fn build_mapping(all_values: impl IntoIterator<Item = String>) -> HashMap<String, String> {
-    let mut sorted: Vec<String> = all_values.into_iter().collect();
-    sorted.sort();
-    sorted.dedup();
+/// Build the deterministic original→obfuscated mapping.
+/// `sorted_unique` must already be sorted and deduplicated (the caller owns this
+/// so it can size a progress bar). `on_value` is called once per processed value.
+fn build_mapping(
+    sorted_unique: Vec<String>,
+    mut on_value: impl FnMut(),
+) -> HashMap<String, String> {
     let mut used: HashSet<String> = HashSet::new();
     let mut mapping: HashMap<String, String> = HashMap::new();
-    for value in sorted {
+    for value in sorted_unique {
         let mut obfuscated = obfuscate_str(&value);
         while used.contains(&obfuscated) {
             obfuscated = increment_obfuscated(&obfuscated);
         }
         used.insert(obfuscated.clone());
         mapping.insert(value, obfuscated);
+        on_value();
     }
     mapping
 }
@@ -311,9 +328,11 @@ mod tests {
     use similar_asserts::assert_eq;
 
     fn obfuscate_single(json_txt: &str) -> Result<String> {
-        let values =
+        let mut values =
             collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
-        let mapping = build_mapping(values);
+        values.sort();
+        values.dedup();
+        let mapping = build_mapping(values, || {});
         Ok(obfuscate_jsontxt(json_txt, &mapping))
     }
 
@@ -321,7 +340,9 @@ mod tests {
         let mut values =
             collect_sensitive_values(serde_json::from_str(json_txt)?, &HashSet::new(), true);
         values.extend(extra.iter().map(std::string::ToString::to_string));
-        let mapping = build_mapping(values);
+        values.sort();
+        values.dedup();
+        let mapping = build_mapping(values, || {});
         Ok(obfuscate_jsontxt(json_txt, &mapping))
     }
 
