@@ -21,7 +21,11 @@ A tool to partially hide json value (using unsecure pseudonimize / obfuscate alg
 ```bash
 ❯ json-simple-obfuscator file1.json file2.json
 
-◇  Obfuscated 2 files
+◇  Collected 2464 values from 102 files in 62.7ms
+│
+◇  Computed 267 replacements in 2.6ms
+│
+◇  Obfuscated 102 files in 103.3ms
 │
 └  Done!
 ```

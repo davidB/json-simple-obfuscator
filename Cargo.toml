@@ -18,6 +18,7 @@ ignored = [
 ] # auto-registered and used at runtime
 
 [dependencies]
+aho-corasick = "1"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 cliclack = "0.5"

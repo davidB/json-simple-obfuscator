@@ -293,6 +293,7 @@ dependencies = [
 name = "json-simple-obfuscator"
 version = "0.4.1"
 dependencies = [
+ "aho-corasick",
  "anyhow",
  "clap",
  "cliclack",
