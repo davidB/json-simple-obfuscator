@@ -348,9 +348,9 @@ impl Replacer {
                     break;
                 }
             }
-            match leftmost_start {
-                Some(start) => from = start + 1,
-                None => return None,
+            {
+                let start = leftmost_start?;
+                from = start + 1;
             }
         }
         None
