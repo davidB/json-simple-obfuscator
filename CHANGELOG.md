@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/davidB/json-simple-obfuscator/compare/0.5.0...0.5.1) - 2026-07-10
+
+### Fixed
+
+- *(git)* reimport manually change from 0.5.0 (erased by errors)
+- *(deps)* update rust to 1.97.0
+
+### Other
+
+- *(deps)* update actions/checkout action to v7 ([#60](https://github.com/davidB/json-simple-obfuscator/pull/60))
+
 ## [0.5.0](https://github.com/davidB/json-simple-obfuscator/compare/0.4.1...0.5.0) - 2026-06-15
 
 ### Added
